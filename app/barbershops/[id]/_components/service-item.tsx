@@ -8,16 +8,15 @@ import Image from "next/image";
 
 interface ServiceItemProps {
   service: Service;
-  isAuthenticated?: boolean;
+  isAuthenticated: boolean;
 }
 
 const ServiceItem = ({ service, isAuthenticated }: ServiceItemProps) => {
   const handleBookingClick = () => {
     if (!isAuthenticated) {
       return signIn("google");
-
-      //TODO: abrir modal de agendamento
     }
+    //TODO: abrir modal de agendamento
   };
   return (
     <Card>
