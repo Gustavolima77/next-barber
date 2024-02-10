@@ -13,11 +13,13 @@ import {
 } from "@/app/_components/ui/sheet";
 import { Barbershop, Service } from "@prisma/client";
 import { ptBR } from "date-fns/locale";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { generateDayTimeList } from "../_helpers/hours";
-import { format } from "date-fns";
+import { format, setHours, setMinutes } from "date-fns";
+import { SaveBooking } from "../_actions/save-booking";
+import { Loader2 } from "lucide-react";
 
 interface ServiceItemProps {
   barbershop: Barbershop;
@@ -30,10 +32,14 @@ const ServiceItem = ({
   barbershop,
   isAuthenticated,
 }: ServiceItemProps) => {
+  const { data } = useSession();
+
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [hour, setHour] = useState<string | undefined>();
+  const [submitIsloading, setSubmitIsLoading] = useState(false);
 
   const handleDateClick = (date: Date | undefined) => {
+    setSubmitIsLoading(true);
     setDate(date);
     setHour(undefined);
   };
@@ -46,10 +52,33 @@ const ServiceItem = ({
     if (!isAuthenticated) {
       return signIn("google");
     }
-    //TODO: abrir modal de agendamento
   };
 
-  const TimeList = useMemo(() => {
+  const handleBookingSubmit = async () => {
+    try {
+      if (!hour || !date || !data?.user) {
+        return;
+      }
+
+      const dateHour = Number(hour.split(":")[0]);
+      const dateMinutes = Number(hour.split(":")[1]);
+
+      const newDate = setMinutes(setHours(date, dateHour), dateMinutes);
+
+      await SaveBooking({
+        serviceId: service.id,
+        barbershopId: barbershop.id,
+        date: newDate,
+        userId: (data.user as any).id,
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSubmitIsLoading(false);
+    }
+  };
+
+  const timeList = useMemo(() => {
     return date ? generateDayTimeList(date) : [];
   }, [date]);
 
@@ -127,7 +156,7 @@ const ServiceItem = ({
                   {/* Mostrar lista de horarios apenas se alguma data estiver selecionada */}
                   {date && (
                     <div className="flex gap-2 overflow-x-auto py-6 px-5 border-t border-y border-solid border-secondary [&::-webkit-scrollbar]:hidden">
-                      {TimeList.map((time) => (
+                      {timeList.map((time) => (
                         <Button
                           onClick={() => handleHourClick(time)}
                           variant={hour === time ? "default" : "outline"}
@@ -180,7 +209,15 @@ const ServiceItem = ({
                     </Card>
                   </div>
                   <SheetFooter className="px-5">
-                    <Button disabled={!hour || !date}>Confirma reserva</Button>
+                    <Button
+                      onClick={handleBookingSubmit}
+                      disabled={!hour || !date || submitIsloading}
+                    >
+                      {submitIsloading && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Confirma reserva
+                    </Button>
                   </SheetFooter>
                 </SheetContent>
               </Sheet>
